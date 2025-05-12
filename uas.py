@@ -2,6 +2,10 @@ import customtkinter
 from tkinter import filedialog
 import numpy as np
 from PIL import Image, ImageTk
+import ast
+
+customtkinter.set_appearance_mode("dark")
+customtkinter.set_default_color_theme("blue")
 
 class identityFrame(customtkinter.CTkFrame):
     def __init__(self, master):
@@ -32,8 +36,12 @@ class equationFrame(customtkinter.CTkFrame):
         self.title = customtkinter.CTkLabel(self, text="Gabor Equation", font=("Helvetica", 18, "bold"))
         self.title.grid(row = 0, column = 0, padx = 0, pady = 10, sticky="nsew")
 
-        eq = Image.open("finger_extract_gabor/eq.png")
-        self.eq = customtkinter.CTkImage(eq, size=(700, 160))
+        try:
+            eq = Image.open("eq.png")
+            eq = eq.resize((700, 160), Image.Resampling.LANCZOS)
+            self.eq = customtkinter.CTkImage(eq, size=(700, 160))
+        except FileNotFoundError:
+            print("Error: 'eq.png' not found. Please ensure the file is in the correct directory.")
 
         self.label = customtkinter.CTkLabel(master = self, image = self.eq, text="")
         self.label.grid(row = 1, column = 0, padx = 0, pady = (10,0), sticky="nsew")
@@ -74,7 +82,7 @@ class parameterFrame(customtkinter.CTkFrame):
         self.lambdaa.grid(row = 2, column = 3, padx = 5, pady = 0)
 
         # Input Gamma
-        self.gamma_label = customtkinter.CTkLabel(self, text="Gamma (θ)")
+        self.gamma_label = customtkinter.CTkLabel(self, text="Gamma (γ)")
         self.gamma_label.grid(row = 1, column = 4, padx=5, pady = (0, 10))
         self.gamma = customtkinter.CTkEntry(self,placeholder_text="ex : 0.5")
         self.gamma.grid(row = 2, column = 4, padx = 5, pady = 0)      
@@ -91,8 +99,8 @@ class parameterFrame(customtkinter.CTkFrame):
         try:
             kernel_input = int(self.kernel.get())
             sigma_input = int(self.sigma.get())
-            theta_input = eval(self.theta.get(), {"__builtins__": {}}, {"np": np})
-            lambda_input = eval(self.lambdaa.get(), {"__builtins__": {}}, {"np": np})
+            theta_input = ast.literal_eval(self.theta.get())
+            lambda_input = ast.literal_eval(self.lambdaa.get())
             gamma_input = float(self.gamma.get())
             phi_input = float(self.phi.get())
 
@@ -102,31 +110,43 @@ class parameterFrame(customtkinter.CTkFrame):
         except Exception as e:
             print("Invalid input:", e)
             
-class uploadImage():
+class imageFrame(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master
+        
+        # Upload Button
+        self.upload_btn = customtkinter.CTkButton(self, text="Upload Image", command=self.upload_image)
+        self.upload_btn.grid(row = 3, column = 0, columnspan = 2, padx = 10, pady = 10, sticky = "nsew")
+        
+        # Image Display 
+        self.image_label = customtkinter.CTkLabel(self, text="")
+        self.image_label.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
     
-    def upload_image():
+    def upload_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
             image = Image.open(file_path)
-            image = ImageTk.PhotoImage(image)
-            image_label.configure(image=image)
-            image_label.image = image\
-                
-    
+            
+            # Get the dimensions of the parent widget (e.g., the frame or label)
+            max_width = self.image_label.winfo_width()
+            max_height = self.image_label.winfo_height()
+
+            # Create a CTkImage (it will handle scaling automatically)
+            ctk_image = customtkinter.CTkImage(light_image=image, size=(max_width, max_height))
+
+            # Update the label with the CTkImage
+            self.image_label.configure(image=ctk_image)
+            self.image_label.image = ctk_image
     
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
 
-        customtkinter.set_appearance_mode("dark")
-        customtkinter.set_default_color_theme("blue")
         self.title("Fingerprint Extraction with Gabor Filter")
 
         for i in range(5):
-            self.grid_rowconfigure(i, weigh = 1)
+            self.grid_rowconfigure(i, weight = 1)
         self.grid_columnconfigure(0, weight = 1)
 
         # Row 1
@@ -141,6 +161,9 @@ class App(customtkinter.CTk):
         self.paramFr = parameterFrame(self)
         self.paramFr.grid(row = 2, column = 0, padx = 10, pady = (10, 0), sticky = "nsew")
         
+        # Upload Image Row
+        self.uploadImg = imageFrame(self)
+        self.uploadImg.grid(row = 3, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")        
         
 
 app = App()
