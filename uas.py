@@ -1,6 +1,7 @@
 import customtkinter
+from tkinter import filedialog
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageTk
 
 class identityFrame(customtkinter.CTkFrame):
     def __init__(self, master):
@@ -31,7 +32,7 @@ class equationFrame(customtkinter.CTkFrame):
         self.title = customtkinter.CTkLabel(self, text="Gabor Equation", font=("Helvetica", 18, "bold"))
         self.title.grid(row = 0, column = 0, padx = 0, pady = 10, sticky="nsew")
 
-        eq = Image.open("eq.png")
+        eq = Image.open("finger_extract_gabor/eq.png")
         self.eq = customtkinter.CTkImage(eq, size=(700, 160))
 
         self.label = customtkinter.CTkLabel(master = self, image = self.eq, text="")
@@ -40,8 +41,6 @@ class equationFrame(customtkinter.CTkFrame):
 class parameterFrame(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
-        
-        
 
         self.grid_rowconfigure((0,1,2,3), weight = 1)
         for i in range(6):
@@ -102,6 +101,21 @@ class parameterFrame(customtkinter.CTkFrame):
             print(f"Lambda: {lambda_input}, Gamma: {gamma_input}, Phi: {phi_input}")
         except Exception as e:
             print("Invalid input:", e)
+            
+class uploadImage():
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+    
+    def upload_image():
+        file_path = filedialog.askopenfilename()
+        if file_path:
+            image = Image.open(file_path)
+            image = ImageTk.PhotoImage(image)
+            image_label.configure(image=image)
+            image_label.image = image\
+                
+    
     
 class App(customtkinter.CTk):
     def __init__(self):
@@ -126,6 +140,8 @@ class App(customtkinter.CTk):
         # Row 3
         self.paramFr = parameterFrame(self)
         self.paramFr.grid(row = 2, column = 0, padx = 10, pady = (10, 0), sticky = "nsew")
+        
+        
 
 app = App()
 app.mainloop()
