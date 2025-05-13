@@ -18,5 +18,6 @@ def basic_binarization(image_path, threshold_value=127):
     
     return binary_image
 
+
 # Example usage
-binary_img = basic_binarization('test2.jpeg', 127)
+binary_img = adaptive_binarization('test2.jpeg', 127)

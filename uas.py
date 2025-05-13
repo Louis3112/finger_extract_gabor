@@ -4,9 +4,11 @@ import numpy as np
 from PIL import Image, ImageTk
 import ast
 import cv2
+import matplotlib.pyplot as plt
 from skimage.color import rgb2gray
 from skimage import img_as_float
 from scipy.ndimage import gaussian_filter
+from scipy import fft
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
@@ -44,188 +46,223 @@ class equationFrame(customtkinter.CTkFrame):
             eq = Image.open("eq.png")
             eq = eq.resize((700, 160), Image.Resampling.LANCZOS)
             self.eq = customtkinter.CTkImage(eq, size=(700, 160))
+            self.label = customtkinter.CTkLabel(master = self, image=self.eq, text="")
+            self.label.grid(row = 1, column = 0, padx = 0, pady = (10,0), sticky="nsew")
         except FileNotFoundError:
             print("Error: 'eq.png' not found. Please ensure the file is in the correct directory.")
-
-        self.label = customtkinter.CTkLabel(master = self, image = self.eq, text="")
-        self.label.grid(row = 1, column = 0, padx = 0, pady = (10,0), sticky="nsew")
-
-class parameterFrame(customtkinter.CTkFrame):
-    def __init__(self, master):
-        super().__init__(master)
-
-        self.grid_rowconfigure((0,1,2,3), weight = 1)
-        for i in range(6):
-            self.grid_columnconfigure(i, weight=1)
-
-        self.title = customtkinter.CTkLabel(self, text= "Parameter Setting for Gabor Filter", font=("Helvetica", 18, "bold"))
-        self.title.grid(row = 0, column = 0, columnspan = 6, padx = 0, pady = 10, sticky = "nsew")
-
-        # Input Kernel
-        self.kernel_label = customtkinter.CTkLabel(self, text="Kernel Size")
-        self.kernel_label.grid(row = 1, column = 0, padx = (10,5), pady = (0, 10))
-        self.kernel = customtkinter.CTkEntry(self,placeholder_text="ex : 50")
-        self.kernel.grid(row = 2, column = 0, padx = (10,5), pady = 0)
-
-        # Input Sigma
-        self.sigma_label = customtkinter.CTkLabel(self, text="Sigma (σ)")
-        self.sigma_label.grid(row = 1, column = 1, padx = 5, pady = (0, 10))
-        self.sigma = customtkinter.CTkEntry(self,placeholder_text="ex : 3")
-        self.sigma.grid(row = 2, column = 1, padx = 5, pady = 0)
- 
-        # Input Theta
-        self.theta_label = customtkinter.CTkLabel(self, text="Theta (θ)")
-        self.theta_label.grid(row = 1, column = 2, padx = 5, pady = (0, 10))
-        self.theta = customtkinter.CTkEntry(self,placeholder_text="ex : 1*np.pi/4")
-        self.theta.grid(row = 2, column = 2, padx = 5, pady = 0)
-
-        # Input Lambda
-        self.lambda_label = customtkinter.CTkLabel(self, text="Lambda (λ)")
-        self.lambda_label.grid(row = 1, column = 3, padx = 5, pady = (0, 10))
-        self.lambdaa = customtkinter.CTkEntry(self,placeholder_text="ex : 1*np.pi/4")
-        self.lambdaa.grid(row = 2, column = 3, padx = 5, pady = 0)
-
-        # Input Gamma
-        self.gamma_label = customtkinter.CTkLabel(self, text="Gamma (γ)")
-        self.gamma_label.grid(row = 1, column = 4, padx=5, pady = (0, 10))
-        self.gamma = customtkinter.CTkEntry(self,placeholder_text="ex : 0.5")
-        self.gamma.grid(row = 2, column = 4, padx = 5, pady = 0)      
-
-        # Input Phi
-        self.phi_label = customtkinter.CTkLabel(self, text="Phi (φ)")
-        self.phi_label.grid(row = 1, column = 5, padx = (5,10), pady = (0, 10))
-        self.phi = customtkinter.CTkEntry(self,placeholder_text="ex : 0")
-        self.phi.grid(row = 2, column = 5, padx = (5,10), pady = 0)
-
-        self.submit_btn = customtkinter.CTkButton(self, text="Submit", command=self.validate_inputs)
-        self.submit_btn.grid(row = 3, column = 0, columnspan = 6, pady = 20, sticky = "nsew")
-    def validate_inputs(self):
-        try:
-            kernel_input = int(self.kernel.get())
-            sigma_input = int(self.sigma.get())
-            theta_input = ast.literal_eval(self.theta.get())
-            lambda_input = ast.literal_eval(self.lambdaa.get())
-            gamma_input = float(self.gamma.get())
-            phi_input = float(self.phi.get())
-
-            print("All inputs valid:")
-            print(f"Kernel: {kernel_input}, Sigma: {sigma_input}, Theta: {theta_input}")
-            print(f"Lambda: {lambda_input}, Gamma: {gamma_input}, Phi: {phi_input}")
-        except Exception as e:
-            print("Invalid input:", e)
-            
+        
 class imageFrame(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master
-        
+        self.processed_image = None
+        self.original_image = None
+
         self.max_width = 300
         self.max_height = 300
         
         # Configure grid
-        self.grid_rowconfigure((0, 1), weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure((0, 1, 2), weight=1)
+        self.grid_columnconfigure((0, 1), weight=1)
         
-        # Create the image label FIRST
+        # Original image frame
+        self.orig_title = customtkinter.CTkLabel(self, text="Original Image")
+        self.orig_title.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="s")
+        
+        # Create the image label for original image
         self.image_label = customtkinter.CTkLabel(self, text="No Image")
-        self.image_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.image_label.grid(row=1, column=0, padx=10, pady=5, sticky="n")
+        
+        # Processed image frame title
+        self.processed_title = customtkinter.CTkLabel(self, text="Processed Image")
+        self.processed_title.grid(row=0, column=1, padx=10, pady=(10, 5), sticky="s")
         
         # Image frame after filtering
-        self.image_frame = customtkinter.CTkFrame(self, text="Image after filtering")
-        self.image_frame.grid(row=0, column=3, padx=10, pady=10, sticky="nsew")
+        self.processed_label = customtkinter.CTkLabel(self, text="No Image")
+        self.processed_label.grid(row=1, column=1, padx=10, pady=5, sticky="n")
+        
+        # Buttons row
+        self.button_frame = customtkinter.CTkFrame(self)
+        self.button_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        self.button_frame.grid_columnconfigure((0, 1), weight=1)
         
         # Upload Button
-        self.upload_btn = customtkinter.CTkButton(self, text="Upload Image", command=self.upload_image)
-        self.upload_btn.grid(row = 3, column = 0,  padx = 5, pady = 10, sticky = "nsew")
+        self.upload_btn = customtkinter.CTkButton(self.button_frame, text="Upload Image", command=self.upload_image)
+        self.upload_btn.grid(row=0, column=0, padx=5, pady=10, sticky="ew")
+        
+        # Convert Button
+        self.convert_btn = customtkinter.CTkButton(self.button_frame, text="Convert", command=self.process_image)
+        self.convert_btn.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
         
 
     def upload_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
-            self.img = Image.open(file_path)
+            self.original_image = Image.open(file_path)
             
-            # Resize with aspect ratio (optional bounding)
-            self.img.thumbnail((self.max_width, self.max_height), Image.Resampling.LANCZOS)
+            # Store the original image for processing
+            self.img = self.original_image.copy()
+            
+            # Resize with aspect ratio for display
+            display_img = self.original_image.copy()
+            display_img.thumbnail((self.max_width, self.max_height), Image.Resampling.LANCZOS)
 
              # Convert to CTkImage (customtkinter's image format)
-            self.ctk_image = customtkinter.CTkImage(self.img, size=(self.img.width, self.img.height))
+            self.ctk_image = customtkinter.CTkImage(display_img, size=(display_img.width, display_img.height))
             
             # Update the image label
             self.image_label.configure(image=self.ctk_image, text="")
             
+            # Reset processed image
+            self.processed_label.configure(image=None, text="No processed image")
+            self.processed_image = None
+    
+    def process_image(self):
+        if not hasattr(self, 'img') or self.img is None:
+            print("Please upload an image first")
+            return
+            
+        try:
+            # Define default parameters for processing
+            filter_params = {
+                "kernel": 31,
+                "sigma": 3,
+                "theta": 1 * np.pi / 4,
+                "lambda": 10,
+                "gamma": 0.5,
+                "phi": 0
+            }
+            
+            # Step 1: Normalize the image
+            normalized = self.normalize(np.array(self.img))
+            
+            # Step 2: Apply segmentation
+            segmented = self.segmentation(normalized)
+            
+            # Step 3: Apply coherence diffusion filter
+            # filtered = self.coherence_diffusion_filter(segmented, filter_params["sigma"])
+            
+            # Step 4: Apply log gabor filter
+            # gabor_filtered = self.log_gabor_filter(filtered, 
+            #                                      wavelength=filter_params["lambda"], 
+            #                                      orientation=filter_params["theta"])
+            
+            # Step 5: Apply binarization
+            final_image = self.binarization(segmented)
+            
+            # Convert the result back to PIL Image for display
+            self.processed_image = Image.fromarray(final_image)
+            
+            # Resize for display
+            display_img = self.processed_image.copy()
+            display_img.thumbnail((self.max_width, self.max_height), Image.Resampling.LANCZOS)
+            
+            # Create CTkImage for display
+            self.processed_ctk_image = customtkinter.CTkImage(display_img, size=(display_img.width, display_img.height))
+            
+            # Update the processed image label
+            self.processed_label.configure(image=self.processed_ctk_image, text="")
+            
+            print("Image processing complete!")
+            
+        except Exception as e:
+            print(f"Error processing image: {e}")
+    
     def normalize(self, img):
-        img = img.convert('L')
+        # Convert to grayscale if it's not already
+        if len(img.shape) > 2:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         
         # Normalize
-        normalized_img = cv2.normalize(np.array(img), None, 0, 255, cv2.NORM_MINMAX)
+        normalized_img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
         
-        return normalized_img
-        
+        return normalized_img.astype(np.uint8)
     
+    # Create segmentation image from normalized image
     def segmentation(self, img):
-        _ , thresh = cv2.threshold(img, np.mean(img), 255, cv2.THRESH_BINARY)
+        # Use Otsu's thresholding for better automatic segmentation
+        _, thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         return thresh
-        
-        
-    def coherence_diffusion_filter(self, img):
-        # Convert to numpy array
-        img = np.array(self.img)
-        
-        # Apply the filter
-        filtered_img = cv2.filter2D(img, cv2.CV_8UC3, cv2.getGaborKernel((31, 31), 0.5, 0, 1, 0, 0, ktype=cv2.CV_32F))
-        
-        return filtered_img
-        
     
-    def log_gabor_filter(self):
+    # Apply coherence diffusion filter after segmentation
+    def coherence_diffusion_filter(self, img, sigma=3):
+        # Apply gaussian filtering for diffusion
+        filtered_img = gaussian_filter(img, sigma=sigma)
         
-        
-    def binarization(self):
-            
-class imageFilterFrame(customtkinter.CTkFrame):
-    def __init__(self, master):
-        super().__init__(master)
-        self.master = master
-        
-        self.grid_rowconfigure((0,1,2,3), weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        
-        self.title = customtkinter.CTkLabel(self, text="Image Filtering", font=("Helvetica", 18, "bold"))
-        self.title.grid(row = 0, column = 0, padx = 0, pady = 10, sticky="nsew")
-        
+        return filtered_img.astype(np.uint8)
     
+    # Apply Log Gabor Filter after Coherence Diffusion Filter
+    def log_gabor_filter(self, img, wavelength=10, orientation=np.pi/4, bandwidth=0.5):
+        # Convert to float for FFT processing
+        img_float = img_as_float(img)
+        
+        # Apply FFT
+        img_fft = fft.fft2(img_float)
+        img_fft_shifted = fft.fftshift(img_fft)
+        
+        rows, cols = img.shape
+        y, x = np.mgrid[-rows//2:rows//2, -cols//2:cols//2]
+        
+        # Calculate radius and angle
+        radius = np.sqrt(x**2 + y**2)
+        radius[rows//2, cols//2] = 1  # Avoid division by zero
+        
+        theta = np.arctan2(y, x)
+        
+        # Create log-Gabor filter
+        log_gabor = np.exp(-(np.log(radius / wavelength))**2 / (2 * np.log(bandwidth)**2))
+        log_gabor[rows//2, cols//2] = 0  # Set DC component to zero
+        
+        # Angular component
+        angular = np.exp(-((theta - orientation) % np.pi)**2 / (2 * (np.pi/4)**2))
+        
+        # Final filter
+        filt = log_gabor * angular
+        
+        # Apply filter in frequency domain
+        filtered_fft = img_fft_shifted * filt
+        
+        # Inverse FFT
+        filtered_img = fft.ifft2(fft.ifftshift(filtered_fft))
+        filtered_img = np.abs(filtered_img)
+        
+        # Normalize back to uint8
+        filtered_img = 255 * (filtered_img - filtered_img.min()) / (filtered_img.max() - filtered_img.min())
+        
+        return filtered_img.astype(np.uint8)
+    
+    # Apply Binarization after Log Gabor Filter
+    def binarization(self, image, threshold_value=127):
+        # Apply adaptive thresholding for better results
+        binary_image = cv2.adaptiveThreshold(image.astype(np.uint8), 255, 
+                                           cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                           cv2.THRESH_BINARY, 11, 2)
+        
+        return binary_image
+
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Fingerprint Extraction with Gabor Filter")
 
-        for i in range(5):
-            self.grid_rowconfigure(i, weight = 1)
-        self.grid_columnconfigure(0, weight = 1)
+        for i in range(3):
+            self.grid_rowconfigure(i, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
         # Row 1
         self.identityFr = identityFrame(self)
-        self.identityFr.grid(row = 0, column = 0, padx = 10, pady = (10, 0), sticky = "nsew")
+        self.identityFr.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
         # Row 2
         self.eqFr = equationFrame(self)
-        self.eqFr.grid(row = 1, column = 0, padx = 10, pady = (10, 0), sticky = "nsew")
+        self.eqFr.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsew")
         
-        # Row 3
-        self.paramFr = parameterFrame(self)
-        self.paramFr.grid(row = 2, column = 0, padx = 10, pady = (10, 0), sticky = "nsew")
-        
-        # Upload Image and Preview
-        self.uploadImg = imageFrame(self)
-        self.uploadImg.grid(row = 4, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")     
-        
-        # Image after filtering
-        self.filteredImg = imageFrame(self)
-        self.filteredImg.grid(row = 5, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")
-        
-        
-
-app = App()
-app.mainloop()
+        # Image processing frame
+        self.imageProcessingFrame = imageFrame(self)
+        self.imageProcessingFrame.grid(row=2, column=0, padx=10, pady=(10, 10), sticky="nsew")
+    
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
