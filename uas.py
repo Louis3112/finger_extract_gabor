@@ -3,6 +3,10 @@ from tkinter import filedialog
 import numpy as np
 from PIL import Image, ImageTk
 import ast
+import cv2
+from skimage.color import rgb2gray
+from skimage import img_as_float
+from scipy.ndimage import gaussian_filter
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
@@ -126,9 +130,13 @@ class imageFrame(customtkinter.CTkFrame):
         self.image_label = customtkinter.CTkLabel(self, text="No Image")
         self.image_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         
+        # Image frame after filtering
+        self.image_frame = customtkinter.CTkFrame(self, text="Image after filtering")
+        self.image_frame.grid(row=0, column=3, padx=10, pady=10, sticky="nsew")
+        
         # Upload Button
         self.upload_btn = customtkinter.CTkButton(self, text="Upload Image", command=self.upload_image)
-        self.upload_btn.grid(row = 3, column = 0, columnspan = 6, padx = 10, pady = 20, sticky = "nsew")
+        self.upload_btn.grid(row = 3, column = 0,  padx = 5, pady = 10, sticky = "nsew")
         
 
     def upload_image(self):
@@ -145,6 +153,47 @@ class imageFrame(customtkinter.CTkFrame):
             # Update the image label
             self.image_label.configure(image=self.ctk_image, text="")
             
+    def normalize(self, img):
+        img = img.convert('L')
+        
+        # Normalize
+        normalized_img = cv2.normalize(np.array(img), None, 0, 255, cv2.NORM_MINMAX)
+        
+        return normalized_img
+        
+    
+    def segmentation(self, img):
+        _ , thresh = cv2.threshold(img, np.mean(img), 255, cv2.THRESH_BINARY)
+        
+        return thresh
+        
+        
+    def coherence_diffusion_filter(self, img):
+        # Convert to numpy array
+        img = np.array(self.img)
+        
+        # Apply the filter
+        filtered_img = cv2.filter2D(img, cv2.CV_8UC3, cv2.getGaborKernel((31, 31), 0.5, 0, 1, 0, 0, ktype=cv2.CV_32F))
+        
+        return filtered_img
+        
+    
+    def log_gabor_filter(self):
+        
+        
+    def binarization(self):
+            
+class imageFilterFrame(customtkinter.CTkFrame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        
+        self.grid_rowconfigure((0,1,2,3), weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        
+        self.title = customtkinter.CTkLabel(self, text="Image Filtering", font=("Helvetica", 18, "bold"))
+        self.title.grid(row = 0, column = 0, padx = 0, pady = 10, sticky="nsew")
+        
     
 class App(customtkinter.CTk):
     def __init__(self):
@@ -170,7 +219,12 @@ class App(customtkinter.CTk):
         
         # Upload Image and Preview
         self.uploadImg = imageFrame(self)
-        self.uploadImg.grid(row = 4, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")        
+        self.uploadImg.grid(row = 4, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")     
+        
+        # Image after filtering
+        self.filteredImg = imageFrame(self)
+        self.filteredImg.grid(row = 5, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")
+        
         
 
 app = App()
