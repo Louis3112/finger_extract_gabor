@@ -115,29 +115,36 @@ class imageFrame(customtkinter.CTkFrame):
         super().__init__(master)
         self.master = master
         
+        self.max_width = 300
+        self.max_height = 300
+        
+        # Configure grid
+        self.grid_rowconfigure((0, 1), weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        
+        # Create the image label FIRST
+        self.image_label = customtkinter.CTkLabel(self, text="No Image")
+        self.image_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        
         # Upload Button
         self.upload_btn = customtkinter.CTkButton(self, text="Upload Image", command=self.upload_image)
-        self.upload_btn.grid(row = 3, column = 0, columnspan = 2, padx = 10, pady = 10, sticky = "nsew")
+        self.upload_btn.grid(row = 3, column = 0, columnspan = 6, padx = 10, pady = 20, sticky = "nsew")
         
-        # Image Display 
-        self.image_label = customtkinter.CTkLabel(self, text="")
-        self.image_label.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
-    
+
     def upload_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
-            image = Image.open(file_path)
+            self.img = Image.open(file_path)
             
-            # Get the dimensions of the parent widget (e.g., the frame or label)
-            max_width = self.image_label.winfo_width()
-            max_height = self.image_label.winfo_height()
+            # Resize with aspect ratio (optional bounding)
+            self.img.thumbnail((self.max_width, self.max_height), Image.Resampling.LANCZOS)
 
-            # Create a CTkImage (it will handle scaling automatically)
-            ctk_image = customtkinter.CTkImage(light_image=image, size=(max_width, max_height))
-
-            # Update the label with the CTkImage
-            self.image_label.configure(image=ctk_image)
-            self.image_label.image = ctk_image
+             # Convert to CTkImage (customtkinter's image format)
+            self.ctk_image = customtkinter.CTkImage(self.img, size=(self.img.width, self.img.height))
+            
+            # Update the image label
+            self.image_label.configure(image=self.ctk_image, text="")
+            
     
 class App(customtkinter.CTk):
     def __init__(self):
@@ -161,9 +168,9 @@ class App(customtkinter.CTk):
         self.paramFr = parameterFrame(self)
         self.paramFr.grid(row = 2, column = 0, padx = 10, pady = (10, 0), sticky = "nsew")
         
-        # Upload Image Row
+        # Upload Image and Preview
         self.uploadImg = imageFrame(self)
-        self.uploadImg.grid(row = 3, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")        
+        self.uploadImg.grid(row = 4, column = 0, padx = 10, pady = (15, 0), sticky = "nsew")        
         
 
 app = App()
