@@ -138,14 +138,15 @@ class imageFrame(customtkinter.CTkFrame):
             
             filtered = self.coherence_diffusion_filter(segmented, filter_params["sigma"])
 
-            gabor_filtered = self.log_gabor_filter(filtered, 
-                                                  wavelength=filter_params["lambda"], 
-                                                  orientation=filter_params["theta"])
+            # gabor_filtered = self.log_gabor_filter(filtered, 
+            #                                       wavelength=filter_params["lambda"], 
+            #                                       orientation=filter_params["theta"])
+            # Halo
             
-            final_image = self.binarization(filtered)
+            final_image = self.binarization(segmented)
             
             # Convert the result back to PIL Image for display
-            self.processed_image = Image.fromarray(final_image)
+            self.processed_image = Image.fromarray(segmented)
             
             # Resize for display
             display_img = self.processed_image.copy()
@@ -176,8 +177,10 @@ class imageFrame(customtkinter.CTkFrame):
     def segmentation(self, img):
         # Use Otsu's thresholding for better automatic segmentation
         _, thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        value , thresh_otsu = cv2.threshold(img, 0, 255, cv2.THRESH_OTSU)
         
-        return thresh
+        return thresh_otsu
+        print()
     
     # Apply coherence diffusion filter after segmentation
     def coherence_diffusion_filter(self, img, sigma=3):
