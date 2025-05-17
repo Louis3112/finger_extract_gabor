@@ -1,62 +1,74 @@
 import numpy as np
+from tkinter import filedialog
 import cv2
-from scipy.ndimage import uniform_filter
 
-def normalize_image(image, window_size=5, mean0=0, var_scale=1.0, M_threshold=None):
+def local_variance(image, window_size):
     """
-    Normalize an image using the G(i,j) equation with conditional processing
+    Calculate local variance for each pixel in the image using the formula:
+    
+    var(m,n) = ∑(i=1 to w) ∑(j=1 to w) [g(i,j) - mean]² / (w × w)
+    
+    Args:
+        image: Input grayscale image as a 2D numpy array
+        window_size: Size of the square window (w)
+    
+    Returns:
+        2D numpy array containing variance at each pixel
     """
-    # Convert to float for calculations
-    img_float = image.astype(np.float32)
+    # Get image dimensions
+    height, width = image.shape
     
-    # Calculate local mean
-    mean_local = uniform_filter(img_float, size=window_size)
+    # Pad the image to handle boundary conditions
+    pad_size = window_size // 2
+    padded_image = np.pad(image, pad_size, mode='reflect')
     
-    # Calculate local variance
-    diff_squared = (img_float - mean_local)**2
-    local_var = uniform_filter(diff_squared, size=window_size)
+    # Initialize output variance map
+    variance_map = np.zeros((height, width))
     
-    # Create the result array
-    normalized = np.zeros_like(img_float)
+    # For each pixel position in the original image
+    for m in range(height):
+        for n in range(width):
+            # Extract the window centered at (m,n)
+            window = padded_image[m:m+window_size, n:n+window_size]
+            
+            # Calculate mean of the window
+            window_mean = np.mean(window)
+            
+            # Calculate the variance using the formula
+            sum_squared_diff = 0
+            for i in range(window_size):
+                for j in range(window_size):
+                    # g(i,j) - mean, squared
+                    sum_squared_diff += (window[i, j] - window_mean)**2
+            
+            # Divide by window size to get variance
+            variance_map[m, n] = sum_squared_diff / (window_size * window_size)
     
-    # Calculate f(i,j) for the conditional part if threshold is provided
-    if M_threshold is not None:
-        # Example f(i,j): gradient magnitude
-        f_ij = cv2.Sobel(img_float, cv2.CV_32F, 1, 1)
-        
-        # Apply different formulas based on condition
-        # For pixels where f(i,j) > M
-        mask = f_ij > M_threshold
-        normalized[mask] = mean0 + np.sqrt(local_var[mask] / var_scale)
-        
-        # For remaining pixels (otherwise condition)
-        normalized[~mask] = mean0 + np.sqrt(local_var[~mask] / var_scale)
-    else:
-        # If no threshold specified, apply the same formula to all pixels
-        normalized = mean0 + np.sqrt(local_var / var_scale)
-    
-    # Scale back to original range
-    min_val, max_val = np.min(normalized), np.max(normalized)
-    if max_val > min_val:  # Avoid division by zero
-        normalized = ((normalized - min_val) / (max_val - min_val)) * 255.0
-    
-    return normalized.astype(np.uint8)
+    return variance_map
 
 # Example usage
+def main():
+    file_path = filedialog.askopenfilename()
+    
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    
+    # Calculate local variance with window size 5
+    variance_map = local_variance(image, window_size=5)
+    
+    # If you want to visualize (requires matplotlib):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(12, 5))
+    
+    plt.subplot(121)
+    plt.imshow(image, cmap='gray')
+    plt.title('Original Image')
+    
+    plt.subplot(122)
+    plt.imshow(variance_map, cmap='viridis')
+    plt.title('Local Variance Map')
+    
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
-    # Load image
-    image = cv2.imread('D:/Work/Code/python/gabor_filter_fingerprint/finger_extract_gabor/DB2_B/109_5.tif', cv2.IMREAD_GRAYSCALE)
-    
-    # Apply normalization
-    normalized_image = normalize_image(
-        image, 
-        window_size=5,
-        mean0=128,
-        var_scale=5.0,
-        M_threshold=50  # Now actually used in the computation
-    )
-    
-    cv2.imshow('Original', image)
-    cv2.imshow('Normalized', normalized_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    main()
