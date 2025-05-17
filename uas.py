@@ -39,7 +39,7 @@ class equationFrame(customtkinter.CTkFrame):
         self.grid_rowconfigure((0,1), weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.title = customtkinter.CTkLabel(self, text="Gabor Equation", font=("Helvetica", 18, "bold"))
+        self.title = customtkinter.CTkLabel(self, text="The Required Steps", font=("Helvetica", 18, "bold"))
         self.title.grid(row = 0, column = 0, padx = 0, pady = 10, sticky="nsew")
 
         try:
@@ -137,10 +137,6 @@ class imageFrame(customtkinter.CTkFrame):
             segmented = self.segmentation(normalized)
             
             filtered = self.coherence_diffusion_filter(segmented, filter_params["sigma"])
-
-            gabor_filtered = self.log_gabor_filter(filtered, 
-                                                  wavelength=filter_params["lambda"], 
-                                                  orientation=filter_params["theta"])
             
             final_image = self.binarization(filtered)
             
@@ -158,77 +154,66 @@ class imageFrame(customtkinter.CTkFrame):
             self.processed_label.configure(image=self.processed_ctk_image, text="")
             
             print("Image processing complete!")
-            
+
         except Exception as e:
             print(f"Error processing image: {e}")
     
     def normalize(self, img):
-        # Convert to grayscale if it's not already
         if len(img.shape) > 2:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         
-        # Normalize
         normalized_img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
         
         return normalized_img.astype(np.uint8)
     
     # Create segmentation image from normalized image
     def segmentation(self, img):
-        # Use Otsu's thresholding for better automatic segmentation
+
         _, thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         return thresh
     
     # Apply coherence diffusion filter after segmentation
     def coherence_diffusion_filter(self, img, sigma=3):
-        # Apply gaussian filtering for diffusion
+
         filtered_img = gaussian_filter(img, sigma=sigma)
         
         return filtered_img.astype(np.uint8)
     
     # Apply Log Gabor Filter after Coherence Diffusion Filter
     def log_gabor_filter(self, img, wavelength=10, orientation=np.pi/4, bandwidth=0.5):
-        # Convert to float for FFT processing
         img_float = img_as_float(img)
         
-        # Apply FFT
         img_fft = fft.fft2(img_float)
         img_fft_shifted = fft.fftshift(img_fft)
         
         rows, cols = img.shape
         y, x = np.mgrid[-rows//2:rows//2, -cols//2:cols//2]
         
-        # Calculate radius and angle
         radius = np.sqrt(x**2 + y**2)
-        radius[rows//2, cols//2] = 1  # Avoid division by zero
+        radius[rows//2, cols//2] = 1  
         
         theta = np.arctan2(y, x)
         
-        # Create log-Gabor filter
         log_gabor = np.exp(-(np.log(radius / wavelength))**2 / (2 * np.log(bandwidth)**2))
-        log_gabor[rows//2, cols//2] = 0  # Set DC component to zero
+        log_gabor[rows//2, cols//2] = 0
         
-        # Angular component
+        
         angular = np.exp(-((theta - orientation) % np.pi)**2 / (2 * (np.pi/4)**2))
         
-        # Final filter
         filt = log_gabor * angular
         
-        # Apply filter in frequency domain
         filtered_fft = img_fft_shifted * filt
         
-        # Inverse FFT
         filtered_img = fft.ifft2(fft.ifftshift(filtered_fft))
         filtered_img = np.abs(filtered_img)
         
-        # Normalize back to uint8
         filtered_img = 255 * (filtered_img - filtered_img.min()) / (filtered_img.max() - filtered_img.min())
         
         return filtered_img.astype(np.uint8)
     
     # Apply Binarization after Log Gabor Filter
     def binarization(self, image, threshold_value=127):
-        # Apply adaptive thresholding for better results
         binary_image = cv2.adaptiveThreshold(image.astype(np.uint8), 255, 
                                            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                            cv2.THRESH_BINARY, 11, 2)
@@ -256,7 +241,7 @@ class App(customtkinter.CTk):
         # Row 3 
         self.imageProcessingFrame = imageFrame(self)
         self.imageProcessingFrame.grid(row=2, column=0, padx=10, pady=(10, 10), sticky="nsew")
-    
+         
 if __name__ == "__main__":
     app = App()
     app.mainloop()
