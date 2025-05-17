@@ -144,7 +144,7 @@ class imageFrame(customtkinter.CTkFrame):
             #                                       orientation=filter_params["theta"])
             # Halo
             
-            final_image = self.binarization(normalized)
+            final_image = self.binarization(segmented)
             
             # Convert the result back to PIL Image for display
             self.processed_image = Image.fromarray(segmented)
@@ -164,7 +164,7 @@ class imageFrame(customtkinter.CTkFrame):
         except Exception as e:
             print(f"Error processing image: {e}")
     
-    def normalize(self, image, window_size=1, mean0=128, var_scale=8.0, M_threshold=None):
+    def normalize(self, image, window_size=1, mean0=128, var_scale=5.0, M_threshold=None):
         """
         Normalize an image using the G(i,j) equation with conditional processing
         """
@@ -205,13 +205,35 @@ class imageFrame(customtkinter.CTkFrame):
         return normalized.astype(np.uint8)
     
     # Create segmentation image from normalized image
-    def segmentation(self, img):
-        # Use Otsu's thresholding for better automatic segmentation
-        _, thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        value , thresh_otsu = cv2.threshold(img, 0, 255, cv2.THRESH_OTSU)
+    def segmentation(self, image, block_size=18, threshold=50):
+        height = image.shape[0]
+        width = image.shape[1]
         
-        return thresh_otsu
-        print()
+        # Determine number of blocks
+        num_block_rows = height // block_size
+        num_block_cols = width // block_size
+        
+        segmented_image = np.zeros((height, width), dtype=np.uint8)
+        
+        for m in range(num_block_rows):
+            for n in range(num_block_cols):
+                # Extract the block
+                block = image[m*block_size:(m+1)*block_size, n*block_size:(n+1)*block_size]
+                
+                # Calculate mean of the block
+                block_sum = np.sum(block)
+                mean = block_sum / (block_size * block_size)
+                
+                # Calculate variance of the block
+                variance_sum = np.sum((block - mean) ** 2)
+                variance = variance_sum / (block_size * block_size)
+                
+                # Check variance threshold
+                if variance > threshold:
+                    # Set the segmented image part to the block's original values
+                    segmented_image[m*block_size:(m+1)*block_size, n*block_size:(n+1)*block_size] = block
+        
+        return segmented_image
         
     
     # Apply coherence diffusion filter after segmentation

@@ -1,76 +1,36 @@
 import numpy as np
-import cv2
-from skimage.color import rgb2gray
-from skimage import img_as_float
-from scipy.ndimage import gaussian_filter
-from skimage.io import imread
+from scipy import ndimage
 import matplotlib.pyplot as plt
 
-def compute_structure_tensor(img, sigma=1.0):
-    Ix = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=3)
-    Iy = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=3)
-    
-    Axx = gaussian_filter(Ix**2, sigma)
-    Axy = gaussian_filter(Ix*Iy, sigma)
-    Ayy = gaussian_filter(Iy**2, sigma)
+# Create a sample noisy image (or load one)
+np.random.seed(0)
+image_size = 100
+original_image = np.zeros((image_size, image_size))
+original_image[20:80, 20:80] = 1 # A white square
+noisy_image = original_image + 0.3 * np.random.randn(image_size, image_size)
+noisy_image = np.clip(noisy_image, 0, 1) # Ensure values are in [0,1]
 
-    return Axx, Axy, Ayy
+# Apply Gaussian filter
+sigma_value = 2.0 # Try changing this value (e.g., 0.5, 1.0, 3.0)
+smoothed_image_scipy = ndimage.gaussian_filter(noisy_image, sigma=sigma_value)
 
-def coherence_diffusion(img, iterations=15, sigma=1.5, gamma=0.2):
-    # Parameter validation
-    if iterations < 1:
-        raise ValueError("Iterations must be positive")
-    if sigma <= 0:
-        raise ValueError("Sigma must be positive")
-    if gamma <= 0:
-        raise ValueError("Gamma must be positive")
+# Display the results
+plt.figure(figsize=(12, 6))
 
-    # Image conversion
-    img = img_as_float(img)
-    if img.ndim == 3:
-        img = rgb2gray(img)
+plt.subplot(1, 3, 1)
+plt.imshow(original_image, cmap='gray')
+plt.title('Original Clean Image')
+plt.axis('off')
 
-    try:
-        u = img.copy()
-        for _ in range(iterations):
-            Axx, Axy, Ayy = compute_structure_tensor(u, sigma)
+plt.subplot(1, 3, 2)
+plt.imshow(noisy_image, cmap='gray')
+plt.title('Noisy Image')
+plt.axis('off')
 
-            # Eigen decomposition
-            trace = Axx + Ayy
-            sqrt_term = np.sqrt((Axx - Ayy)**2 + 4*Axy**2)
-            lambda1 = trace / 2 + sqrt_term / 2
-            lambda2 = trace / 2 - sqrt_term / 2
+plt.subplot(1, 3, 3)
+plt.imshow(smoothed_image_scipy, cmap='gray')
+plt.title(f'Gaussian Filtered (SciPy, sigma={sigma_value})')
+plt.axis('off')
 
-            # Coherence (used to guide diffusion)
-            coherence = (lambda1 - lambda2)**2 / (lambda1 + lambda2 + 1e-12)**2
-
-            # Apply diffusion guided by coherence
-            Ix = cv2.Sobel(u, cv2.CV_64F, 1, 0, ksize=3)
-            Iy = cv2.Sobel(u, cv2.CV_64F, 0, 1, ksize=3)
-
-            diffusion = gamma * (Ix * (1 - coherence) + Iy * (1 - coherence))
-            u += diffusion
-        return np.clip(u, 0, 1)
-    except Exception as e:
-        raise RuntimeError(f"Error during diffusion: {str(e)}")
-
-# Usage
-try:
-    img = imread('el.JPG')
-    filtered_img = coherence_diffusion(img)
-    
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.title("Original")
-    plt.imshow(img)
-    plt.axis('off')
-
-    plt.subplot(1, 2, 2)
-    plt.title("Coherence Diffusion")
-    plt.imshow(filtered_img, cmap='gray')
-    plt.axis('off')
-    plt.show()
-except FileNotFoundError:
-    print("Error: Image file not found")
-except Exception as e:
-    print(f"An error occurred: {str(e)}")
+plt.tight_layout()
+plt.show()
