@@ -9,6 +9,7 @@ from skimage.color import rgb2gray
 from skimage import img_as_float
 from scipy.ndimage import gaussian_filter
 from scipy import fft
+from scipy.ndimage import uniform_filter
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
@@ -143,7 +144,7 @@ class imageFrame(customtkinter.CTkFrame):
             #                                       orientation=filter_params["theta"])
             # Halo
             
-            final_image = self.binarization(segmented)
+            final_image = self.binarization(normalized)
             
             # Convert the result back to PIL Image for display
             self.processed_image = Image.fromarray(segmented)
@@ -163,15 +164,45 @@ class imageFrame(customtkinter.CTkFrame):
         except Exception as e:
             print(f"Error processing image: {e}")
     
-    def normalize(self, img):
-        # Convert to grayscale if it's not already
-        if len(img.shape) > 2:
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    def normalize(self, image, window_size=1, mean0=128, var_scale=8.0, M_threshold=None):
+        """
+        Normalize an image using the G(i,j) equation with conditional processing
+        """
+        # Convert to float for calculations
+        img_float = image.astype(np.float32)
         
-        # Normalize
-        normalized_img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
+        # Calculate local mean
+        mean_local = np.mean(img_float)
         
-        return normalized_img.astype(np.uint8)
+        # Calculate local variance
+        diff_squared = (img_float - mean_local)**2
+        local_var = uniform_filter(diff_squared, size=window_size)
+        
+        # Create the result array
+        normalized = np.zeros_like(img_float)
+        
+        # Calculate f(i,j) for the conditional part if threshold is provided
+        if M_threshold is not None:
+            # Example f(i,j): gradient magnitude
+            f_ij = cv2.Sobel(img_float, cv2.CV_32F, 1, 1)
+            
+            # Apply different formulas based on condition
+            # For pixels where f(i,j) > M
+            mask = f_ij > M_threshold
+            normalized[mask] = mean0 + np.sqrt(local_var[mask] / var_scale)
+            
+            # For remaining pixels (otherwise condition)
+            normalized[~mask] = mean0 + np.sqrt(local_var[~mask] / var_scale)
+        else:
+            # If no threshold specified, apply the same formula to all pixels
+            normalized = mean0 + np.sqrt(local_var / var_scale)
+        
+        # Scale back to original range
+        min_val, max_val = np.min(normalized), np.max(normalized)
+        if max_val > min_val:  # Avoid division by zero
+            normalized = ((normalized - min_val) / (max_val - min_val)) * 255.0
+        
+        return normalized.astype(np.uint8)
     
     # Create segmentation image from normalized image
     def segmentation(self, img):
