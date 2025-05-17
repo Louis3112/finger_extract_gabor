@@ -1,0 +1,10 @@
+semua rumus pake hitungan manual dan jangan pake function bawaan
+
+# Normalization
+- Mean dan varians untuk memastikan intensitas piksel yang dinormalisasi tersebar secara merata. 
+Ini memastikan penggunaan nilai tiap piksel dengan kontras yang lebih baik
+
+
+
+Binarization akhir tambahkan otsu thresholding. 
+berguna untuk meningkatkan kontras. 

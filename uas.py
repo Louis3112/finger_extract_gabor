@@ -19,7 +19,7 @@ class identityFrame(customtkinter.CTkFrame):
         self.grid_rowconfigure((0,1,2), weight=1)
         self.grid_columnconfigure((0,1), weight=1)
 
-        self.title = customtkinter.CTkLabel(self, text="Fingerprint Extraction with Gabor Filter", font=("Helvetica", 24, "bold"))
+        self.title = customtkinter.CTkLabel(self, text="Fingerprint Enchancement with Multiple Filters", font=("Helvetica", 22, "bold"))
         self.title.grid(row = 0, column = 0, columnspan = 2, padx = 0, pady = 10, sticky = "nsew")
 
         self.louis = customtkinter.CTkLabel(self, text="Cornelius Louis Nathan", font=("Helvetica", 12, "bold"))
@@ -44,8 +44,8 @@ class equationFrame(customtkinter.CTkFrame):
 
         try:
             eq = Image.open("eq.png")
-            eq = eq.resize((700, 160), Image.Resampling.LANCZOS)
-            self.eq = customtkinter.CTkImage(eq, size=(700, 160))
+            eq = eq.resize((800, 300), Image.Resampling.LANCZOS)
+            self.eq = customtkinter.CTkImage(eq, size=(800, 300))
             self.label = customtkinter.CTkLabel(master = self, image=self.eq, text="")
             self.label.grid(row = 1, column = 0, padx = 0, pady = (10,0), sticky="nsew")
         except FileNotFoundError:
@@ -61,7 +61,6 @@ class imageFrame(customtkinter.CTkFrame):
         self.max_width = 300
         self.max_height = 300
         
-        # Configure grid
         self.grid_rowconfigure((0, 1, 2), weight=1)
         self.grid_columnconfigure((0, 1), weight=1)
         
@@ -125,31 +124,29 @@ class imageFrame(customtkinter.CTkFrame):
         try:
             # Define default parameters for processing
             filter_params = {
-                "kernel": 31,
-                "sigma": 3,
-                "theta": 1 * np.pi / 4,
-                "lambda": 10,
+                "kernel": 80,
+                "sigma": 1,
+                "theta": 1 * np.pi/2,
+                "lambda": 1000,
                 "gamma": 0.5,
                 "phi": 0
             }
             
-            # Step 1: Normalize the image
             normalized = self.normalize(np.array(self.img))
             
-            # Step 2: Apply segmentation
             segmented = self.segmentation(normalized)
             
-            # Step 3: Apply coherence diffusion filter
-            # filtered = self.coherence_diffusion_filter(segmented, filter_params["sigma"])
+            filtered = self.coherence_diffusion_filter(segmented, filter_params["sigma"])
+
+            # gabor_filtered = self.log_gabor_filter(filtered, 
+            #                                       wavelength=filter_params["lambda"], 
+            #                                       orientation=filter_params["theta"])
+            # Halo
             
-            # Step 4: Apply log gabor filter
-            # gabor_filtered = self.log_gabor_filter(filtered, wavelength=filter_params["lambda"], orientation=filter_params["theta"])
-            
-            # Step 5: Apply binarization
             final_image = self.binarization(segmented)
             
             # Convert the result back to PIL Image for display
-            self.processed_image = Image.fromarray(final_image)
+            self.processed_image = Image.fromarray(segmented)
             
             # Resize for display
             display_img = self.processed_image.copy()
@@ -180,8 +177,11 @@ class imageFrame(customtkinter.CTkFrame):
     def segmentation(self, img):
         # Use Otsu's thresholding for better automatic segmentation
         _, thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        value , thresh_otsu = cv2.threshold(img, 0, 255, cv2.THRESH_OTSU)
         
-        return thresh
+        return thresh_otsu
+        print()
+        
     
     # Apply coherence diffusion filter after segmentation
     def coherence_diffusion_filter(self, img, sigma=3):
@@ -189,6 +189,7 @@ class imageFrame(customtkinter.CTkFrame):
         filtered_img = gaussian_filter(img, sigma=sigma)
         
         return filtered_img.astype(np.uint8)
+    
     
     # Apply Log Gabor Filter after Coherence Diffusion Filter
     def log_gabor_filter(self, img, wavelength=10, orientation=np.pi/4, bandwidth=0.5):
@@ -257,7 +258,7 @@ class App(customtkinter.CTk):
         self.eqFr = equationFrame(self)
         self.eqFr.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsew")
         
-        # Image processing frame
+        # Row 3 
         self.imageProcessingFrame = imageFrame(self)
         self.imageProcessingFrame.grid(row=2, column=0, padx=10, pady=(10, 10), sticky="nsew")
     
